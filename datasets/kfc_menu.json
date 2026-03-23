@@ -1,0 +1,83 @@
+{
+  "name": "KFC Real Menu Dataset",
+  "currency": "INR",
+  "menu": [
+    {
+      "category": "Chicken Buckets",
+      "items": [
+        { "name": "6 Pc Hot & Crispy Chicken",  "price": 499, "veg": false },
+        { "name": "8 Pc Hot & Crispy Chicken",  "price": 649, "veg": false },
+        { "name": "12 Pc Hot & Crispy Chicken", "price": 949, "veg": false },
+        { "name": "6 Pc Classic Chicken",       "price": 459, "veg": false },
+        { "name": "8 Pc Classic Chicken",       "price": 599, "veg": false },
+        { "name": "12 Pc Classic Chicken",      "price": 899, "veg": false }
+      ]
+    },
+    {
+      "category": "Burgers",
+      "items": [
+        { "name": "Zinger Burger",          "price": 199, "veg": false },
+        { "name": "Chicken Krisper Burger", "price": 129, "veg": false },
+        { "name": "Double Down Burger",     "price": 249, "veg": false },
+        { "name": "Veg Zinger Burger",      "price": 179, "veg": true  }
+      ]
+    },
+    {
+      "category": "Chicken",
+      "items": [
+        { "name": "1 Pc Hot & Crispy Chicken", "price": 99,  "veg": false },
+        { "name": "2 Pc Hot & Crispy Chicken", "price": 189, "veg": false },
+        { "name": "1 Pc Classic Chicken",      "price": 89,  "veg": false },
+        { "name": "2 Pc Classic Chicken",      "price": 169, "veg": false }
+      ]
+    },
+    {
+      "category": "Snacks",
+      "items": [
+        { "name": "Popcorn Chicken Regular", "price": 129, "veg": false },
+        { "name": "Popcorn Chicken Large",   "price": 199, "veg": false },
+        { "name": "Chicken Nuggets (6 Pc)",  "price": 149, "veg": false },
+        { "name": "Chicken Nuggets (9 Pc)",  "price": 199, "veg": false },
+        { "name": "Hot Wings (5 Pc)",        "price": 179, "veg": false },
+        { "name": "Hot Wings (10 Pc)",       "price": 329, "veg": false }
+      ]
+    },
+    {
+      "category": "Meals & Combos",
+      "items": [
+        { "name": "Zinger Burger Combo",    "price": 299, "veg": false },
+        { "name": "Chicken Krisper Combo",  "price": 249, "veg": false },
+        { "name": "2 Pc Chicken Meal",      "price": 249, "veg": false },
+        { "name": "Popcorn Chicken Meal",   "price": 229, "veg": false },
+        { "name": "Veg Zinger Combo",       "price": 249, "veg": true  }
+      ]
+    },
+    {
+      "category": "Sides",
+      "items": [
+        { "name": "French Fries (Regular)", "price": 109, "veg": true  },
+        { "name": "French Fries (Large)",   "price": 139, "veg": true  },
+        { "name": "Veg Strips (3 Pc)",      "price": 99,  "veg": true  },
+        { "name": "Coleslaw",               "price": 79,  "veg": true  },
+        { "name": "Mashed Potato",          "price": 89,  "veg": true  }
+      ]
+    },
+    {
+      "category": "Beverages",
+      "items": [
+        { "name": "Pepsi (Small)",   "price": 59, "veg": true },
+        { "name": "Pepsi (Medium)",  "price": 79, "veg": true },
+        { "name": "Pepsi (Large)",   "price": 99, "veg": true },
+        { "name": "7UP (Medium)",    "price": 79, "veg": true },
+        { "name": "Mirinda (Medium)","price": 79, "veg": true }
+      ]
+    },
+    {
+      "category": "Desserts",
+      "items": [
+        { "name": "Chocolate Lava Cake", "price": 109, "veg": true },
+        { "name": "Ice Cream Cup",       "price": 79,  "veg": true }
+      ]
+    }
+  ]
+}
