@@ -199,6 +199,63 @@ def detect_price_intent(question):
     return None
 
 
+def detect_price_range(question):
+    """
+    Detect price range constraints from natural language.
+    Returns a dict with any of: {min, max}  — both in same currency as dataset.
+
+    Examples handled:
+      "below 200"          → {max: 200}
+      "under 300"          → {max: 300}
+      "less than 150"      → {max: 150}
+      "above 100"          → {min: 100}
+      "more than 500"      → {min: 500}
+      "over 400"           → {min: 400}
+      "between 100 and 300"→ {min: 100, max: 300}
+      "100 to 300"         → {min: 100, max: 300}
+      "price 200"          → {max: 200}   ← treated as "under X" when no qualifier
+      "under rs 200"       → {max: 200}   ← handles "rs", "inr", "rupees" prefix
+      "below rs. 200"      → {max: 200}
+    """
+    q = question.lower()
+    result = {}
+
+    # Strip currency symbols / words so numbers are clean
+    q_clean = re.sub(r'(?:rs\.?|inr|rupees?|₹)\s*', '', q)
+
+    # Pattern: "between X and Y"  /  "X to Y"  /  "X - Y"
+    between = re.search(
+        r'between\s+(\d+)\s+(?:and|to|-)\s+(\d+)'
+        r'|(\d+)\s+(?:to|-)\s+(\d+)',
+        q_clean
+    )
+    if between:
+        g = between.groups()
+        if g[0] and g[1]:
+            result['min'] = int(g[0]);  result['max'] = int(g[1])
+        elif g[2] and g[3]:
+            result['min'] = int(g[2]);  result['max'] = int(g[3])
+        return result
+
+    # Pattern: "below / under / less than / cheaper than / at most / max X"
+    below = re.search(
+        r'(?:below|under|less than|cheaper than|at most|max(?:imum)?|not more than|upto?|up to)\s+(\d+)',
+        q_clean
+    )
+    if below:
+        result['max'] = int(below.group(1))
+
+    # Pattern: "above / over / more than / at least / min X"
+    above = re.search(
+        r'(?:above|over|more than|greater than|at least|min(?:imum)?|not less than)\s+(\d+)',
+        q_clean
+    )
+    if above:
+        result['min'] = int(above.group(1))
+
+    return result   # empty dict = no price range constraint
+
+
 def find_matching_categories(question):
     """Return list of category names whose keywords appear in the question."""
     q = question.lower()
@@ -238,6 +295,7 @@ def menu_search(dataset, question):
     broad_intent = detect_broad_intent(question)
     price_intent = detect_price_intent(question)
     veg_intent   = detect_veg_intent(question)
+    price_range  = detect_price_range(question)   # ← NEW: {min?, max?}
 
     def apply_veg_filter(items):
         """Filter by veg/nonveg if requested, else return as-is."""
@@ -247,10 +305,21 @@ def menu_search(dataset, question):
             return [i for i in items if i.get("veg") is False]
         return items
 
+    def apply_price_range_filter(pool):
+        """Filter pool to items within the detected price range."""
+        if not price_range:
+            return pool
+        lo = price_range.get("min", 0)
+        hi = price_range.get("max", float("inf"))
+        return [i for i in pool if lo <= i["price"] <= hi]
+
     def apply_price_filter(pool):
-        """Apply cheap/costly/popular price intent to a pool."""
+        """Apply cheap/costly/popular price intent OR price range to a pool."""
         if not pool:
             return pool
+        # Price range takes priority over cheap/costly/popular
+        if price_range:
+            return apply_price_range_filter(pool)
         if price_intent == "cheap":
             min_p = min(i["price"] for i in pool)
             return [i for i in pool if i["price"] == min_p]
@@ -264,16 +333,23 @@ def menu_search(dataset, question):
     # ── 1. BROAD INTENT ───────────────────────────────────────────────────────
     if broad_intent == "full_menu":
         pool   = apply_veg_filter(all_items)
-        result = apply_price_filter(pool) if price_intent else pool
-        return result, [], price_intent, broad_intent
+        result = apply_price_filter(pool) if (price_intent or price_range) else pool
+        return result, [], price_intent, broad_intent, price_range
 
     if broad_intent == "popular_all":
         pool   = apply_veg_filter(all_items)
         result = sorted(pool, key=lambda x: x["price"], reverse=True)[:3]
-        return result, [], "popular", broad_intent
+        return result, [], "popular", broad_intent, price_range
 
     # ── 2. CATEGORY MATCH ─────────────────────────────────────────────────────
     categories = find_matching_categories(question)
+
+    # Special case: price_range with NO specific category → search all items
+    if not categories and price_range:
+        pool   = apply_veg_filter(all_items)
+        result = apply_price_range_filter(pool)
+        if result:
+            return result, [], price_intent, "price_range_all", price_range
 
     # Special case: "veg meal/food/option" with NO specific category keyword
     # → search across ALL categories for veg items
@@ -281,14 +357,14 @@ def menu_search(dataset, question):
         pool = apply_veg_filter(all_items)
         result = apply_price_filter(pool)
         if result:
-            return result, [], price_intent, "veg_all"
+            return result, [], price_intent, "veg_all", price_range
 
     if categories:
         pool   = [i for i in all_items if i["category"] in categories]
         pool   = apply_veg_filter(pool)
         result = apply_price_filter(pool)
         # If veg filter wiped the pool, result will be empty → handled below
-        return result, categories, price_intent, None
+        return result, categories, price_intent, None, price_range
 
     # ── 3. ITEM NAME KEYWORD SEARCH ───────────────────────────────────────────
     q = question.lower()
@@ -309,9 +385,9 @@ def menu_search(dataset, question):
     result = apply_price_filter(pool)
 
     if not result:
-        return [], [], price_intent, None  # Truly out of scope
+        return [], [], price_intent, None, price_range  # Truly out of scope
 
-    return result, [], price_intent, None
+    return result, [], price_intent, None, price_range
 
 
 # ── Gratitude messages per mode & intent ─────────────────────────────────────
@@ -348,8 +424,31 @@ MEDIUM_INTROS = {
 CURRENCY_SYMBOL = {"INR": "₹", "USD": "$", "GBP": "£", "EUR": "€"}
 
 
+def _make_range_intro(price_range, sym, mode, veg_label=""):
+    """Generate a greeting for price-range filtered results."""
+    lo = price_range.get("min")
+    hi = price_range.get("max")
+    veg = f" {veg_label}" if veg_label else ""
+
+    if lo and hi:
+        label = f"between {sym}{lo} and {sym}{hi}"
+    elif hi:
+        label = f"under {sym}{hi}"
+    else:
+        label = f"above {sym}{lo}"
+
+    if mode == "easy":
+        return random.choice([
+            f"🍗 Here are all{veg} items priced {label}:",
+            f"🍗 Great! Found these{veg} options {label}:",
+            f"🍗 Here's what we have{veg} {label}:",
+        ])
+    else:
+        return f"🍗{veg} Items {label}:"
+
+
 def build_menu_response(items, categories, price_intent, mode, currency="INR",
-                         broad_intent=None):
+                         broad_intent=None, price_range=None):
     """
     Format matched menu items into a response based on mode.
     easy   → warm greeting + grouped items with prices
@@ -358,6 +457,7 @@ def build_menu_response(items, categories, price_intent, mode, currency="INR",
 
     broad_intent='full_menu' → always show category headers regardless of count
     broad_intent='popular_all' → uses popular greeting
+    price_range={min?,max?}  → show price-range intro
     """
     if not items:
         return None
@@ -369,8 +469,8 @@ def build_menu_response(items, categories, price_intent, mode, currency="INR",
     for item in items:
         grouped.setdefault(item["category"], []).append(item)
 
-    # Always show headers if multiple categories OR it's a full-menu request
-    show_headers = (len(grouped) > 1) or (broad_intent == "full_menu")
+    # Always show headers if multiple categories OR full-menu / cross-category request
+    show_headers = (len(grouped) > 1) or broad_intent in ("full_menu", "price_range_all", "veg_all")
 
     if mode == "hard":
         if show_headers:
@@ -402,6 +502,21 @@ def build_menu_response(items, categories, price_intent, mode, currency="INR",
 
     # Choose intro based on broad_intent override or price_intent
     effective_intent = "popular" if broad_intent == "popular_all" else price_intent
+
+    # ── Price-range intro takes highest priority ───────────────────────────────
+    if price_range:
+        # Detect veg label for intro text
+        all_veg    = all(i.get("veg") for i in items)
+        all_nonveg = all(not i.get("veg") for i in items)
+        veg_label  = "veg" if all_veg else ("non-veg" if all_nonveg else "")
+        easy_intro   = _make_range_intro(price_range, sym, "easy",   veg_label)
+        medium_intro = _make_range_intro(price_range, sym, "medium", veg_label)
+        if mode == "easy":
+            return f"{easy_intro}\n\n{core}"
+        elif mode == "medium":
+            return f"{medium_intro}\n\n{core}"
+        else:
+            return core
 
     if broad_intent == "full_menu":
         easy_intro = random.choice([
@@ -888,12 +1003,13 @@ def chat():
         if dataset and is_menu_dataset(dataset):
             # ── NEW structured menu dataset ───────────────────────────────────
             currency = dataset.get("currency", "INR")
-            items, categories, price_intent, broad_intent = menu_search(dataset, user_message)
+            items, categories, price_intent, broad_intent, price_range = menu_search(dataset, user_message)
 
             if items:
                 body = build_menu_response(
                     items, categories, price_intent, response_mode, currency,
-                    broad_intent=broad_intent
+                    broad_intent=broad_intent,
+                    price_range=price_range
                 )
                 prefix = f"🍗 **KFC Assistant** *({mode_label})*\n\n"
                 assistant_message = prefix + body
